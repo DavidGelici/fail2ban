@@ -10,20 +10,23 @@ curl -sSfL "https://github.com/DavidGelici/fail2ban/raw/master/settings/postgres
 curl -sSfL "https://github.com/DavidGelici/fail2ban/raw/master/settings/postgresql.conf" -o /etc/fail2ban/filter.d/postgresql.conf 2>&1
 sed -i "s~destemail = root@localhost~destemail = $useremail~g" /etc/fail2ban/jail.conf
 
-for logfile in $(grep 'logpath =' /etc/fail2ban/jail.conf | tr ' ' :); do 
-  file=$(echo $logfile | cut -d ":" -f 3);
-  mkdir -p $(echo $file | grep -Eo '.*\/')
-  touch $file
-done;
-
-# CNT=0
-# for logfile in $(grep -n 'logpath =' /etc/fail2ban/jail.conf | tr ' ' :); do 
-#   path=$(echo $logfile | cut -d ":" -f 4);
-#   if [ ! -f "$path" ]; then
-#     sed -i "$(($(echo $logfile | cut -d ":" -f 1)+$CNT)) i enabled = false" /etc/fail2ban/jail.conf;
-#     (( CNT++ ));
-#   fi
-# done;
+config_file="/etc/fail2ban/jail.conf"
+temp_file="temp.conf"
+while IFS= read -r line; do
+  if [[ $line =~ ^logpath[[:space:]]*=[[:space:]]*(.*) ]]; then
+    log_path="${BASH_REMATCH[1]}"
+    if [[ -d $log_path ]]; then
+      echo "$line"
+      echo "enabled = true"
+    else
+      echo "$line"
+      echo "enabled = false"
+    fi
+  else
+    echo "$line"
+  fi
+done < "$config_file" > "$temp_file"
+mv "$temp_file" "$config_file"
 
 systemctl daemon-reload
 /etc/init.d/fail2ban start
